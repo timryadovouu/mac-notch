@@ -1,0 +1,278 @@
+import AppKit
+
+enum BufferKind {
+    case text, image, file
+}
+
+/// One saved clipboard entry, backed by a real file on disk.
+struct BufferItem: Identifiable, Hashable {
+    let id: String        // absolute file path
+    let url: URL
+    let kind: BufferKind
+    let date: Date
+    var name: String { url.lastPathComponent }
+}
+
+/// Persistent clipboard buffer.
+///
+/// Everything copied is saved as a real file under `~/Documents/localBuffer`,
+/// into a per-day subfolder named like `2026-09-04`. Supports text, images and
+/// any copied files (photos, videos, documents, ...). Day folders older than
+/// `retentionDays` are deleted automatically.
+final class BufferManager: ObservableObject {
+    @Published private(set) var recent: [BufferItem] = []
+
+    private(set) var rootURL: URL
+    let maxRecent = 20
+
+    /// Fired on a new external copy — used for the "brow widens left" effect.
+    var onNewItem: ((BufferItem) -> Void)?
+
+    private let settings: Settings
+    private var lastChangeCount: Int
+    private var lastText: String?
+    private var lastDay: String = ""
+    private var reloadTick = 0
+    private var timer: Timer?
+    private let io = DispatchQueue(label: "io.macnotch.localBuffer")
+
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
+    }()
+    private static let stampFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "HH-mm-ss-SSS"; return f
+    }()
+    private static let imageExts: Set<String> =
+        ["png", "jpg", "jpeg", "gif", "heic", "heif", "tiff", "bmp", "webp"]
+
+    init(settings: Settings) {
+        self.settings = settings
+        rootURL = settings.bufferRoot
+        lastChangeCount = NSPasteboard.general.changeCount
+        lastDay = Self.dayFormatter.string(from: Date())
+
+        try? FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        cleanupOld()
+        reloadItems()
+
+        let t = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in self?.check() }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
+    }
+
+    /// Re-read the folder / retention from settings (call after they change).
+    func applySettings() {
+        rootURL = settings.bufferRoot
+        try? FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        cleanupOld()
+        reloadItems()
+    }
+
+    /// Delete the whole buffer for today.
+    func clearToday() {
+        let today = rootURL.appendingPathComponent(Self.dayFormatter.string(from: Date()))
+        try? FileManager.default.removeItem(at: today)
+        reloadItems()
+    }
+
+    /// Delete a single entry.
+    func delete(_ item: BufferItem) {
+        try? FileManager.default.removeItem(at: item.url)
+        reloadItems()
+    }
+
+    // MARK: - Pasteboard monitoring
+
+    /// When the calendar day changes, optionally delete the day that just ended.
+    private func checkDayRollover() {
+        let today = Self.dayFormatter.string(from: Date())
+        guard today != lastDay else { return }
+        let ended = lastDay
+        lastDay = today
+        if settings.clearBufferAtEndOfDay {
+            try? FileManager.default.removeItem(at: rootURL.appendingPathComponent(ended))
+        }
+        cleanupOld()
+        reloadItems()
+    }
+
+    private func check() {
+        checkDayRollover()
+
+        // Every ~2s, rescan so files deleted/added directly in the folder
+        // (e.g. in Finder) are reflected in the notch. reloadItems() is a no-op
+        // when nothing changed.
+        reloadTick += 1
+        if reloadTick % 4 == 0 { reloadItems() }
+
+        let pb = NSPasteboard.general
+        guard pb.changeCount != lastChangeCount else { return }
+        lastChangeCount = pb.changeCount
+
+        // Read the pasteboard on the main thread, then do the heavy file I/O
+        // off the main thread so large videos don't hitch the UI.
+        let fileURLs = pb.readObjects(forClasses: [NSURL.self],
+                                      options: [.urlReadingFileURLsOnly: true]) as? [URL]
+        let image = NSImage(pasteboard: pb)
+        let text = pb.string(forType: .string)
+
+        io.async { [weak self] in
+            guard let self else { return }
+            var saved: BufferItem?
+
+            if let urls = fileURLs, !urls.isEmpty {
+                for u in urls { saved = self.saveFile(from: u) ?? saved }
+            } else if let image {
+                saved = self.saveImage(image)
+            } else if let text,
+                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if text == self.lastText { return }
+                self.lastText = text
+                saved = self.saveText(text)
+            }
+
+            guard let item = saved else { return }
+            DispatchQueue.main.async {
+                self.reloadItems()
+                self.onNewItem?(item)
+            }
+        }
+    }
+
+    // MARK: - Saving
+
+    private func todayURL() -> URL {
+        let url = rootURL.appendingPathComponent(Self.dayFormatter.string(from: Date()),
+                                                 isDirectory: true)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private func saveFile(from src: URL) -> BufferItem? {
+        let dest = uniqueURL(in: todayURL(), name: src.lastPathComponent)
+        do {
+            try FileManager.default.copyItem(at: src, to: dest)
+            return item(for: dest)
+        } catch {
+            return nil
+        }
+    }
+
+    private func saveImage(_ image: NSImage) -> BufferItem? {
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return nil }
+        let dest = todayURL().appendingPathComponent(stampName(ext: "png"))
+        try? png.write(to: dest)
+        return item(for: dest)
+    }
+
+    private func saveText(_ text: String) -> BufferItem? {
+        let dest = todayURL().appendingPathComponent(stampName(ext: "txt"))
+        try? text.data(using: .utf8)?.write(to: dest)
+        return item(for: dest)
+    }
+
+    private func stampName(ext: String) -> String {
+        "\(Self.stampFormatter.string(from: Date())).\(ext)"
+    }
+
+    private func uniqueURL(in dir: URL, name: String) -> URL {
+        let fm = FileManager.default
+        var candidate = dir.appendingPathComponent(name)
+        let base = (name as NSString).deletingPathExtension
+        let ext = (name as NSString).pathExtension
+        var i = 1
+        while fm.fileExists(atPath: candidate.path) {
+            let next = ext.isEmpty ? "\(base)-\(i)" : "\(base)-\(i).\(ext)"
+            candidate = dir.appendingPathComponent(next)
+            i += 1
+        }
+        return candidate
+    }
+
+    // MARK: - Listing / retention
+
+    private func item(for url: URL) -> BufferItem {
+        let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey])
+            .contentModificationDate) ?? Date()
+        return BufferItem(id: url.path, url: url, kind: kind(for: url), date: date)
+    }
+
+    private func kind(for url: URL) -> BufferKind {
+        let ext = url.pathExtension.lowercased()
+        if ext == "txt" { return .text }
+        if Self.imageExts.contains(ext) { return .image }
+        return .file
+    }
+
+    /// Rescan the retained day folders for recent items (newest first).
+    func reloadItems() {
+        let fm = FileManager.default
+        guard let days = try? fm.contentsOfDirectory(at: rootURL,
+                                                     includingPropertiesForKeys: nil) else {
+            recent = []; return
+        }
+        var all: [BufferItem] = []
+        for day in days where (try? day.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+            let files = (try? fm.contentsOfDirectory(at: day,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+                options: [.skipsHiddenFiles])) ?? []
+            all.append(contentsOf: files.map { item(for: $0) })
+        }
+        all.sort { $0.date > $1.date }
+        let newItems = Array(all.prefix(maxRecent))
+        // Only republish when the on-disk set actually changed (so external
+        // deletions/additions show up, but we don't churn the UI otherwise).
+        if newItems.map(\.id) != recent.map(\.id) {
+            recent = newItems
+        }
+    }
+
+    private func cleanupOld() {
+        let fm = FileManager.default
+        guard let days = try? fm.contentsOfDirectory(at: rootURL,
+                                                     includingPropertiesForKeys: nil) else { return }
+
+        // When "clear at end of day" is on, keep only today's folder.
+        if settings.clearBufferAtEndOfDay {
+            let today = Self.dayFormatter.string(from: Date())
+            for day in days {
+                guard Self.dayFormatter.date(from: day.lastPathComponent) != nil else { continue }
+                if day.lastPathComponent != today { try? fm.removeItem(at: day) }
+            }
+            return
+        }
+
+        let cutoff = Calendar.current.date(byAdding: .day, value: -settings.bufferRetentionDays,
+                                           to: Calendar.current.startOfDay(for: Date()))!
+        for day in days {
+            guard let date = Self.dayFormatter.date(from: day.lastPathComponent) else { continue }
+            if date < cutoff { try? fm.removeItem(at: day) }
+        }
+    }
+
+    // MARK: - Actions
+
+    /// Copy an item back to the system pasteboard.
+    func copyToPasteboard(_ item: BufferItem) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        switch item.kind {
+        case .text:
+            let s = (try? String(contentsOf: item.url, encoding: .utf8)) ?? ""
+            pb.setString(s, forType: .string)
+        case .image:
+            if let img = NSImage(contentsOf: item.url) { pb.writeObjects([img]) }
+            else { pb.writeObjects([item.url as NSURL]) }
+        case .file:
+            pb.writeObjects([item.url as NSURL])
+        }
+        lastChangeCount = pb.changeCount   // don't re-capture our own copy
+    }
+
+    /// Open the localBuffer folder in Finder to browse all dates.
+    func openInFinder() {
+        NSWorkspace.shared.open(rootURL)
+    }
+}
