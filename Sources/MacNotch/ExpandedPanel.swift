@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum Module: String, CaseIterable, Identifiable {
-    case media, timer, tasks, buffer, screenTime, system
+    case media, timer, tasks, buffer, screenTime
     var id: String { rawValue }
 
     var icon: String {
@@ -11,7 +11,6 @@ enum Module: String, CaseIterable, Identifiable {
         case .tasks: return "checklist"
         case .buffer: return "doc.on.clipboard"
         case .screenTime: return "hourglass"
-        case .system: return "cpu"
         }
     }
 
@@ -22,19 +21,20 @@ enum Module: String, CaseIterable, Identifiable {
         case .tasks: return "Tasks"
         case .buffer: return "Buffer"
         case .screenTime: return "Screen Time"
-        case .system: return "System"
         }
     }
 }
 
-/// Contents of the expanded brow: a horizontal icon rail plus the active module.
+/// Contents of the expanded brow: live system metrics flanking the camera, an
+/// icon rail, and the active module.
 struct ExpandedPanel: View {
     @ObservedObject var state: NotchState
     @ObservedObject var settings: Settings
+    @ObservedObject var system: SystemStats
     let modules: AppModules
+    let notchWidth: CGFloat
     let topInset: CGFloat
 
-    /// The module to show — the selected one, unless it was disabled.
     private var current: Module {
         settings.isEnabled(state.currentModule)
             ? state.currentModule
@@ -42,7 +42,8 @@ struct ExpandedPanel: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
+            headerMetrics.frame(height: topInset)
             rail
             Group {
                 switch current {
@@ -51,17 +52,58 @@ struct ExpandedPanel: View {
                 case .tasks: TodoPanel(store: modules.todo, state: state)
                 case .buffer: BufferPanel(manager: modules.buffer, state: state)
                 case .screenTime: ScreenTimePanel(usage: modules.usage, state: state)
-                case .system: SystemPanel(stats: modules.system)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(.horizontal, 18)
-        .padding(.top, topInset + 8)
+        .padding(.top, 2)
         .padding(.bottom, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .foregroundStyle(.white)
     }
+
+    // MARK: - System metrics (in the black areas beside the camera)
+
+    private var headerMetrics: some View {
+        HStack(spacing: 0) {
+            metric("CPU", system.cpu, "\(Int(system.cpu * 100))%",
+                   Color(red: 1.0, green: 0.45, blue: 0.4))
+                .frame(maxWidth: .infinity)
+
+            Color.clear.frame(width: notchWidth)   // camera gap
+
+            metric("RAM", system.ramFraction, ramValue,
+                   Color(red: 0.4, green: 0.75, blue: 1.0))
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var ramValue: String {
+        let gb = 1_073_741_824.0
+        return String(format: "%.1f/%d GB", system.ramUsed / gb, Int((system.ramTotal / gb).rounded()))
+    }
+
+    private func metric(_ label: String, _ fraction: Double, _ value: String, _ color: Color) -> some View {
+        HStack(spacing: 5) {
+            Text(label)
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(.white.opacity(0.45))
+                .frame(width: 26, alignment: .leading)
+            Capsule().fill(Color.white.opacity(0.12))
+                .frame(width: 46, height: 4)
+                .overlay(alignment: .leading) {
+                    Capsule().fill(color)
+                        .frame(width: 46 * min(1, max(0.03, fraction)), height: 4)
+                }
+            Text(value)
+                .font(.system(size: 8, weight: .medium)).monospacedDigit()
+                .foregroundStyle(.white.opacity(0.7))
+                .fixedSize()
+        }
+    }
+
+    // MARK: - Rail
 
     private var rail: some View {
         HStack(spacing: 5) {

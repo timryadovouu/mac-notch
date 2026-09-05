@@ -27,6 +27,7 @@ final class Settings: ObservableObject {
 
     // MARK: General
     @Published var launchAtLogin: Bool { didSet { applyLoginItem() } }
+    @Published var trackClaude: Bool { didSet { d.set(trackClaude, forKey: "trackClaude") } }
 
     private let d = UserDefaults.standard
 
@@ -51,6 +52,7 @@ final class Settings: ObservableObject {
 
         screenTimeRetentionDays = d.object(forKey: "screenTimeRetentionDays") as? Int ?? 365
 
+        trackClaude = d.object(forKey: "trackClaude") as? Bool ?? false
         launchAtLogin = (SMAppService.mainApp.status == .enabled)
     }
 

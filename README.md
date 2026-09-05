@@ -118,5 +118,4 @@ build-app.sh                          release build → mac-notch.app
 
 ## Notes
 
-Inspired by [macnotch.io](https://macnotch.io) — this is a much simpler,
-self-contained take focused on a handful of everyday modules.
+Inspired by [macnotch.io](https://macnotch.io).

@@ -6,6 +6,8 @@ struct NotchRootView: View {
     @ObservedObject var state: NotchState
     @ObservedObject var pomodoro: PomodoroModel
     @ObservedObject var media: MediaController
+    @ObservedObject var claude: ClaudeSessionsManager
+    @ObservedObject var settings: Settings
     let modules: AppModules
     let metrics: NotchMetrics
 
@@ -17,6 +19,7 @@ struct NotchRootView: View {
 
     private let timerPillW: CGFloat = 70
     private let eqW: CGFloat = 40
+    private let claudeW: CGFloat = 14   // small coral island (~4x narrower than the music one)
     // Extra black bled onto the menu bar on each side, to hide the 1px seam
     // between the pure-black notch and the tinted menu bar.
     private let bleed: CGFloat = 2
@@ -32,6 +35,10 @@ struct NotchRootView: View {
 
     private var rightExt: CGFloat { (!state.expanded && running) ? timerPillW : 0 }
 
+    /// Coral "Claude is thinking" island, shown while ≥1 session is working.
+    private var showClaude: Bool { !state.expanded && settings.trackClaude && claude.anyWorking }
+    private var claudeExt: CGFloat { showClaude ? claudeW : 0 }
+
     /// Left extension shows either a transient alert or a music equalizer.
     private var leftExt: CGFloat {
         guard !state.expanded else { return 0 }
@@ -43,12 +50,12 @@ struct NotchRootView: View {
     }
 
     private var islandW: CGFloat {
-        state.expanded ? Self.panelWidth : notchW + leftExt + rightExt + bleed * 2
+        state.expanded ? Self.panelWidth : notchW + leftExt + claudeExt + rightExt + bleed * 2
     }
     private var islandH: CGFloat { (state.expanded ? Self.expandedHeight(state.tall) : notchH) + Self.topOvershoot }
     private var radius: CGFloat { state.expanded ? 28 : min(13, notchH / 2) }
     // Shift the center so the middle (notch) portion stays over the camera.
-    private var centerShift: CGFloat { state.expanded ? 0 : (rightExt - leftExt) / 2 }
+    private var centerShift: CGFloat { state.expanded ? 0 : (claudeExt + rightExt - leftExt) / 2 }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -75,6 +82,7 @@ struct NotchRootView: View {
                 .animation(.spring(response: 0.28, dampingFraction: 0.72), value: state.alert)
                 .animation(.spring(response: 0.3, dampingFraction: 0.78), value: running)
                 .animation(.spring(response: 0.3, dampingFraction: 0.78), value: playing)
+                .animation(.spring(response: 0.3, dampingFraction: 0.78), value: showClaude)
                 .animation(.spring(response: 0.34, dampingFraction: 0.84), value: state.tall)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -84,7 +92,8 @@ struct NotchRootView: View {
 
     @ViewBuilder private var islandContent: some View {
         if state.expanded {
-            ExpandedPanel(state: state, settings: modules.settings, modules: modules,
+            ExpandedPanel(state: state, settings: modules.settings, system: modules.system,
+                          modules: modules, notchWidth: notchW,
                           topInset: notchH + Self.topOvershoot)
                 .transition(.opacity)
         } else {
@@ -118,6 +127,17 @@ struct NotchRootView: View {
 
             // Center — camera area, drawn empty.
             Color.clear.frame(width: notchW)
+
+            // Claude island (coral) — inner to the timer, shown while a session thinks.
+            ZStack {
+                if showClaude {
+                    Capsule().fill(Color(red: 0.980, green: 0.514, blue: 0.302))
+                        .padding(.vertical, notchH * 0.30)
+                        .padding(.horizontal, 2)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .frame(width: claudeExt)
 
             // Right extension — running countdown.
             ZStack {

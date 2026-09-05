@@ -6,10 +6,12 @@ final class SettingsWindowController {
     private var window: NSWindow?
     private let settings: Settings
     private let buffer: BufferManager
+    private let claude: ClaudeSessionsManager
 
-    init(settings: Settings, buffer: BufferManager) {
+    init(settings: Settings, buffer: BufferManager, claude: ClaudeSessionsManager) {
         self.settings = settings
         self.buffer = buffer
+        self.claude = claude
     }
 
     func show() {
@@ -23,7 +25,7 @@ final class SettingsWindowController {
             w.title = "mac-notch Settings"
             w.isReleasedWhenClosed = false
             w.contentView = NSHostingView(
-                rootView: SettingsView(settings: settings, buffer: buffer)
+                rootView: SettingsView(settings: settings, buffer: buffer, claude: claude)
             )
             // Place it below the expanded notch so opening it from the notch
             // doesn't overlap the panel.
@@ -54,11 +56,14 @@ final class SettingsWindowController {
 struct SettingsView: View {
     @ObservedObject var settings: Settings
     let buffer: BufferManager
+    let claude: ClaudeSessionsManager
 
     var body: some View {
         Form {
             Section("General") {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
+                Toggle("Track Claude Code sessions", isOn: $settings.trackClaude)
+                    .onChange(of: settings.trackClaude) { on in if on { claude.installHooks() } }
             }
 
             Section("Modules") {

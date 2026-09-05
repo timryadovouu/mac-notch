@@ -9,7 +9,8 @@ final class AppModules {
     let usage: AppUsageTracker
     let todo: TodoStore
     let media: MediaController
-    lazy var settingsWindow = SettingsWindowController(settings: settings, buffer: buffer)
+    let claude: ClaudeSessionsManager
+    lazy var settingsWindow = SettingsWindowController(settings: settings, buffer: buffer, claude: claude)
 
     init() {
         let settings = Settings()
@@ -20,6 +21,7 @@ final class AppModules {
         usage = AppUsageTracker(settings: settings)
         todo = TodoStore()
         media = MediaController()
+        claude = ClaudeSessionsManager()
     }
 
     /// Shared support directory: ~/Library/Application Support/MacNotch

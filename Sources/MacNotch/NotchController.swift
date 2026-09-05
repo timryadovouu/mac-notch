@@ -51,7 +51,8 @@ final class NotchController {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 
         let root = NotchRootView(state: state, pomodoro: modules.pomodoro,
-                                 media: modules.media, modules: modules, metrics: metrics)
+                                 media: modules.media, claude: modules.claude,
+                                 settings: modules.settings, modules: modules, metrics: metrics)
         let hosting = FirstMouseHostingView(rootView: root)
         hosting.frame = panel.contentView!.bounds
         hosting.autoresizingMask = [.width, .height]
