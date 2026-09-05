@@ -22,15 +22,17 @@ final class Settings: ObservableObject {
     @Published var longBreakMinutes: Int { didSet { d.set(longBreakMinutes, forKey: "longBreakMinutes") } }
     @Published var pomodoroSound: Bool { didSet { d.set(pomodoroSound, forKey: "pomodoroSound") } }
 
+    // MARK: Screen Time
+    @Published var screenTimeRetentionDays: Int { didSet { d.set(screenTimeRetentionDays, forKey: "screenTimeRetentionDays") } }
+
     // MARK: General
     @Published var launchAtLogin: Bool { didSet { applyLoginItem() } }
 
     private let d = UserDefaults.standard
 
     init() {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         bufferRootPath = d.string(forKey: "bufferRootPath")
-            ?? docs.appendingPathComponent("localBuffer").path
+            ?? AppModules.supportDirectory.appendingPathComponent("localBuffer").path
         bufferRetentionDays = d.object(forKey: "bufferRetentionDays") as? Int ?? 7
         clearBufferAtEndOfDay = d.object(forKey: "clearBufferAtEndOfDay") as? Bool ?? false
         recallMinutes = d.object(forKey: "recallMinutes") as? Int ?? 30
@@ -46,6 +48,8 @@ final class Settings: ObservableObject {
         shortBreakMinutes = d.object(forKey: "shortBreakMinutes") as? Int ?? 5
         longBreakMinutes = d.object(forKey: "longBreakMinutes") as? Int ?? 15
         pomodoroSound = d.object(forKey: "pomodoroSound") as? Bool ?? true
+
+        screenTimeRetentionDays = d.object(forKey: "screenTimeRetentionDays") as? Int ?? 365
 
         launchAtLogin = (SMAppService.mainApp.status == .enabled)
     }

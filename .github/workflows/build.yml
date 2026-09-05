@@ -11,7 +11,7 @@ jobs:
     name: Build & package
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Swift version
         run: swift --version
@@ -23,7 +23,7 @@ jobs:
         run: ./build-app.sh
 
       - name: Upload app bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: mac-notch-app
           path: mac-notch.app

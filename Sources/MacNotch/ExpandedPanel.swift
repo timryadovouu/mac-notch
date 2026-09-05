@@ -49,8 +49,8 @@ struct ExpandedPanel: View {
                 case .media: MediaPanel(media: modules.media)
                 case .timer: PomodoroPanel(model: modules.pomodoro)
                 case .tasks: TodoPanel(store: modules.todo, state: state)
-                case .buffer: BufferPanel(manager: modules.buffer)
-                case .screenTime: ScreenTimePanel(usage: modules.usage)
+                case .buffer: BufferPanel(manager: modules.buffer, state: state)
+                case .screenTime: ScreenTimePanel(usage: modules.usage, state: state)
                 case .system: SystemPanel(stats: modules.system)
                 }
             }

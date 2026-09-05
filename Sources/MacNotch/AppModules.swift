@@ -17,7 +17,7 @@ final class AppModules {
         pomodoro = PomodoroModel(settings: settings)
         buffer = BufferManager(settings: settings)
         system = SystemStats()
-        usage = AppUsageTracker()
+        usage = AppUsageTracker(settings: settings)
         todo = TodoStore()
         media = MediaController()
     }

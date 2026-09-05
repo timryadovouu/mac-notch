@@ -51,6 +51,7 @@ final class BufferManager: ObservableObject {
         lastChangeCount = NSPasteboard.general.changeCount
         lastDay = Self.dayFormatter.string(from: Date())
 
+        migrateFromDocuments()   // one-time move out of the TCC-protected Documents folder
         try? FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         cleanupOld()
         reloadItems()
@@ -58,6 +59,38 @@ final class BufferManager: ObservableObject {
         let t = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in self?.check() }
         RunLoop.main.add(t, forMode: .common)
         timer = t
+    }
+
+    /// Move the buffer out of ~/Documents/localBuffer (TCC-protected, prompts on
+    /// every launch) into Application Support. Runs once, only for users still on
+    /// the old Documents default.
+    private func migrateFromDocuments() {
+        let fm = FileManager.default
+        let oldURL = fm.urls(for: .documentDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("localBuffer")
+        guard settings.bufferRootPath == oldURL.path else { return }
+
+        let newURL = AppModules.supportDirectory.appendingPathComponent("localBuffer")
+        if fm.fileExists(atPath: oldURL.path) {
+            if !fm.fileExists(atPath: newURL.path) {
+                try? fm.moveItem(at: oldURL, to: newURL)
+            } else {
+                // Merge day-folders into the existing destination.
+                let days = (try? fm.contentsOfDirectory(at: oldURL, includingPropertiesForKeys: nil)) ?? []
+                for day in days {
+                    let dest = newURL.appendingPathComponent(day.lastPathComponent)
+                    if !fm.fileExists(atPath: dest.path) { try? fm.moveItem(at: day, to: dest) }
+                }
+                try? fm.removeItem(at: oldURL)
+            }
+        }
+        // Only switch to the new location once the data has actually left Documents
+        // (so a denied-permission move retries on a later launch instead of
+        // abandoning the old buffer).
+        if !fm.fileExists(atPath: oldURL.path) {
+            settings.bufferRootPath = newURL.path
+            rootURL = newURL
+        }
     }
 
     /// Re-read the folder / retention from settings (call after they change).

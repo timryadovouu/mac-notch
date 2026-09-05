@@ -77,6 +77,17 @@ struct SettingsView: View {
                 Toggle("Play sound when a session ends", isOn: $settings.pomodoroSound)
             }
 
+            Section("Screen Time") {
+                Picker("Keep history", selection: $settings.screenTimeRetentionDays) {
+                    Text("30 days").tag(30)
+                    Text("90 days").tag(90)
+                    Text("180 days").tag(180)
+                    Text("1 year").tag(365)
+                    Text("2 years").tag(730)
+                    Text("Unlimited").tag(100_000)
+                }
+            }
+
             Section("Buffer") {
                 HStack {
                     Text("Folder")

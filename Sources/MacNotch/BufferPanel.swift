@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BufferPanel: View {
     @ObservedObject var manager: BufferManager
+    @ObservedObject var state: NotchState
 
     var body: some View {
         VStack(spacing: 8) {
@@ -49,6 +50,8 @@ struct BufferPanel: View {
                 .buttonStyle(.plain)
                 .help("Delete today's whole buffer")
             }
+
+            GrabberBar(state: state)
         }
     }
 }

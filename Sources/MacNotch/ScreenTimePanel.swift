@@ -2,31 +2,88 @@ import SwiftUI
 
 struct ScreenTimePanel: View {
     @ObservedObject var usage: AppUsageTracker
+    @ObservedObject var state: NotchState
+    @State private var offset = 0                 // 0 = today, -1 = yesterday…
+    @State private var cached: DayStats? = nil     // loaded stats for a past day
+    @State private var earliest = 0
+
+    private var stats: DayStats {
+        offset == 0 ? usage.today : (cached ?? .empty(dateFor(offset)))
+    }
 
     var body: some View {
         VStack(spacing: 10) {
+            dateHeader
+
             HStack {
-                stat(title: "Total", value: formatDuration(usage.totalSeconds))
+                stat(title: "Total", value: formatDuration(stats.total))
                 Spacer()
-                stat(title: "Switches", value: "\(usage.switchCount)")
+                stat(title: "Switches", value: "\(stats.switches)")
             }
 
-            if usage.ranked.isEmpty {
+            if stats.apps.isEmpty {
                 Spacer()
-                Text("Tracking starts now").font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.4))
+                Text(offset == 0 ? "Tracking starts now" : "No activity that day")
+                    .font(.system(size: 12)).foregroundStyle(.white.opacity(0.4))
                 Spacer()
             } else {
                 ScrollView {
                     VStack(spacing: 7) {
-                        ForEach(usage.ranked.prefix(8)) { app in
-                            row(app)
-                        }
+                        ForEach(stats.apps.prefix(8)) { row($0) }
                     }
                 }
             }
+
+            GrabberBar(state: state)
+        }
+        .onAppear { earliest = usage.earliestOffset() }
+        .onChange(of: offset) { newOffset in
+            cached = newOffset == 0 ? nil : usage.loadDay(offset: newOffset)
+            earliest = usage.earliestOffset()
         }
     }
+
+    // MARK: - Date header
+
+    private var dateHeader: some View {
+        HStack {
+            navButton("chevron.left", enabled: offset > earliest) { offset -= 1 }
+            Spacer()
+            Text(dateLabel)
+                .font(.system(size: 12, weight: .semibold))
+            Spacer()
+            navButton("chevron.right", enabled: offset < 0) { offset += 1 }
+        }
+    }
+
+    private func navButton(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 28, height: 24)
+                .background(Color.white.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white.opacity(enabled ? 0.8 : 0.25))
+        .disabled(!enabled)
+    }
+
+    private var dateLabel: String {
+        switch offset {
+        case 0: return "Today"
+        case -1: return "Yesterday"
+        default:
+            let f = DateFormatter(); f.dateFormat = "EEE, d MMM"
+            return f.string(from: dateFor(offset))
+        }
+    }
+
+    private func dateFor(_ o: Int) -> Date {
+        Calendar.current.date(byAdding: .day, value: o, to: Date()) ?? Date()
+    }
+
+    // MARK: - Rows
 
     private func stat(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -36,7 +93,7 @@ struct ScreenTimePanel: View {
     }
 
     private func row(_ app: AppUsage) -> some View {
-        let fraction = usage.totalSeconds > 0 ? Double(app.seconds) / Double(usage.totalSeconds) : 0
+        let fraction = stats.total > 0 ? Double(app.seconds) / Double(stats.total) : 0
         return VStack(spacing: 3) {
             HStack(spacing: 7) {
                 Group {
