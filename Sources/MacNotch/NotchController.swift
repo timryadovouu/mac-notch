@@ -23,8 +23,6 @@ final class NotchController {
     private let modules: AppModules
     private let metrics: NotchMetrics
     private var pollTimer: Timer?
-    private var signalSource: DispatchSourceSignal?
-    private var pinned = false          // held open by the global hotkey
 
     private let windowWidth: CGFloat = 640
     // Tall enough to hold the expanded panel in its "tall" (Tasks-grown) size.
@@ -69,28 +67,6 @@ final class NotchController {
         positionWindow()
         panel.orderFrontRegardless()
         startPolling()
-        setupHotkey()
-    }
-
-    // MARK: - Global hotkey (SIGUSR1)
-
-    /// Toggle the notch when we receive SIGUSR1, so an external hotkey manager
-    /// (e.g. AeroSpace) can open it:  pkill -USR1 -x MacNotch
-    private func setupHotkey() {
-        signal(SIGUSR1, SIG_IGN)
-        let src = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
-        src.setEventHandler { [weak self] in self?.toggleFromHotkey() }
-        src.resume()
-        signalSource = src
-    }
-
-    private func toggleFromHotkey() {
-        if state.expanded {
-            collapse()
-        } else {
-            expand()
-            pinned = true        // stay open (ignoring the cursor) until toggled again
-        }
     }
 
     private func positionWindow() {
@@ -135,7 +111,6 @@ final class NotchController {
     private func updateHover() {
         let mouse = NSEvent.mouseLocation
         if state.expanded {
-            if pinned { return }                      // held open by the hotkey
             if Date() < state.holdUntil { return }    // grace period after a grabber tap
             if !expandedZone.contains(mouse) { collapse() }
         } else {
@@ -157,7 +132,6 @@ final class NotchController {
         guard state.expanded else { return }
         state.expanded = false
         state.tall = false          // reset the Tasks grow-toggle on close
-        pinned = false
         panel.ignoresMouseEvents = true
     }
 }
