@@ -12,6 +12,8 @@ struct NotchRootView: View {
     // Expanded panel size.
     static let panelWidth: CGFloat = 560
     static let panelHeight: CGFloat = 272
+    static let panelHeightTall: CGFloat = 430
+    static func expandedHeight(_ tall: Bool) -> CGFloat { tall ? panelHeightTall : panelHeight }
 
     private let timerPillW: CGFloat = 70
     private let eqW: CGFloat = 40
@@ -43,7 +45,7 @@ struct NotchRootView: View {
     private var islandW: CGFloat {
         state.expanded ? Self.panelWidth : notchW + leftExt + rightExt + bleed * 2
     }
-    private var islandH: CGFloat { (state.expanded ? Self.panelHeight : notchH) + Self.topOvershoot }
+    private var islandH: CGFloat { (state.expanded ? Self.expandedHeight(state.tall) : notchH) + Self.topOvershoot }
     private var radius: CGFloat { state.expanded ? 28 : min(13, notchH / 2) }
     // Shift the center so the middle (notch) portion stays over the camera.
     private var centerShift: CGFloat { state.expanded ? 0 : (rightExt - leftExt) / 2 }
@@ -73,6 +75,7 @@ struct NotchRootView: View {
                 .animation(.spring(response: 0.28, dampingFraction: 0.72), value: state.alert)
                 .animation(.spring(response: 0.3, dampingFraction: 0.78), value: running)
                 .animation(.spring(response: 0.3, dampingFraction: 0.78), value: playing)
+                .animation(.spring(response: 0.34, dampingFraction: 0.84), value: state.tall)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         // Fill into the notch/menu-bar safe area so no thin gap shows at the top.
@@ -81,7 +84,8 @@ struct NotchRootView: View {
 
     @ViewBuilder private var islandContent: some View {
         if state.expanded {
-            ExpandedPanel(state: state, modules: modules, topInset: notchH + Self.topOvershoot)
+            ExpandedPanel(state: state, settings: modules.settings, modules: modules,
+                          topInset: notchH + Self.topOvershoot)
                 .transition(.opacity)
         } else {
             collapsed

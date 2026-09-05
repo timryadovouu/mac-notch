@@ -13,6 +13,15 @@ final class NotchState: ObservableObject {
     @Published var expanded = false
     @Published var alert: NotchAlert?
     @Published var currentModule: Module
+    /// Tasks "grow the panel vertically" toggle (reset when the notch closes).
+    @Published var tall = false
+
+    /// Keep the notch open (ignoring the cursor) until this moment — used after
+    /// a grabber tap so shrinking doesn't instantly collapse the panel.
+    private(set) var holdUntil = Date.distantPast
+    func holdOpen(_ seconds: TimeInterval = 2) {
+        holdUntil = Date().addingTimeInterval(seconds)
+    }
 
     private let settings: Settings
     /// If the notch was last opened more than this long ago, reset to default.
@@ -42,6 +51,9 @@ final class NotchState: ObservableObject {
     func prepareForExpand() {
         if Date().timeIntervalSince(lastOpen) > recallWindow {
             currentModule = settings.defaultModule
+        }
+        if !settings.isEnabled(currentModule) {
+            currentModule = settings.enabledModules.first ?? .tasks
         }
         touch()
     }

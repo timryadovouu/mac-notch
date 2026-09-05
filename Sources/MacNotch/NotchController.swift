@@ -25,7 +25,8 @@ final class NotchController {
     private var pollTimer: Timer?
 
     private let windowWidth: CGFloat = 640
-    private let windowHeight: CGFloat = 360
+    // Tall enough to hold the expanded panel in its "tall" (Tasks-grown) size.
+    private let windowHeight: CGFloat = 480
 
     init(modules: AppModules) {
         self.modules = modules
@@ -103,13 +104,14 @@ final class NotchController {
         let f = metrics.screenFrame
         let pad: CGFloat = 12
         let w = NotchRootView.panelWidth + pad * 2
-        let bottom = f.maxY - NotchRootView.panelHeight - pad
+        let bottom = f.maxY - NotchRootView.expandedHeight(state.tall) - pad
         return NSRect(x: f.midX - w / 2, y: bottom, width: w, height: f.maxY - bottom + 40)
     }
 
     private func updateHover() {
         let mouse = NSEvent.mouseLocation
         if state.expanded {
+            if Date() < state.holdUntil { return }   // grace period after a grabber tap
             if !expandedZone.contains(mouse) { collapse() }
         } else {
             if notchZone.contains(mouse) { expand() }
@@ -129,6 +131,7 @@ final class NotchController {
     private func collapse() {
         guard state.expanded else { return }
         state.expanded = false
+        state.tall = false          // reset the Tasks grow-toggle on close
         panel.ignoresMouseEvents = true
     }
 }

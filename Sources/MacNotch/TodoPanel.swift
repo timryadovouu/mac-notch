@@ -1,7 +1,9 @@
 import SwiftUI
+import AppKit
 
 struct TodoPanel: View {
     @ObservedObject var store: TodoStore
+    @ObservedObject var state: NotchState
     @State private var draft = ""
     @State private var showTrash = false
 
@@ -15,6 +17,8 @@ struct TodoPanel: View {
                 addField
                 activeList
             }
+
+            grabber
         }
     }
 
@@ -61,6 +65,12 @@ struct TodoPanel: View {
         draft = ""
     }
 
+    private func copyTitle(_ text: String) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+    }
+
     private var activeList: some View {
         Group {
             if store.items.isEmpty {
@@ -74,6 +84,7 @@ struct TodoPanel: View {
                         ForEach(store.items) { item in
                             TaskRow(item: item,
                                     onToggle: { store.toggle(item) },
+                                    onCopy: { copyTitle(item.title) },
                                     onDelete: { store.delete(item) })
                         }
                     }
@@ -116,11 +127,29 @@ struct TodoPanel: View {
             }
         }
     }
+
+    /// iPhone-style home-indicator pill: tap to grow / shrink the panel height.
+    private var grabber: some View {
+        Button {
+            state.holdOpen(2)          // keep open ~2s so shrinking doesn't insta-close
+            state.tall.toggle()
+        } label: {
+            Capsule()
+                .fill(Color.white.opacity(0.35))
+                .frame(width: 42, height: 5)
+                .padding(.vertical, 4)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(state.tall ? "Shrink panel" : "Grow panel")
+    }
 }
 
 private struct TaskRow: View {
     let item: TodoItem
     let onToggle: () -> Void
+    let onCopy: () -> Void
     let onDelete: () -> Void
     @State private var hovering = false
 
@@ -140,23 +169,35 @@ private struct TaskRow: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if hovering {
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11, weight: .medium))
-                        .frame(width: 26, height: 26)
-                        .foregroundStyle(Color(red: 1, green: 0.5, blue: 0.5))
-                        .background(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(Color.red.opacity(0.18))
-                        )
-                }
-                .buttonStyle(.plain)
+            // Always laid out (only shown on hover) so the row height never jumps.
+            HStack(spacing: 6) {
+                rowButton("doc.on.doc", help: "Copy", action: onCopy)
+                rowButton("trash", help: "Delete", danger: true, action: onDelete)
             }
+            .opacity(hovering ? 1 : 0)
+            .allowsHitTesting(hovering)
         }
-        .padding(.horizontal, 10).padding(.vertical, 7)
+        .frame(height: 26)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .background(Color.white.opacity(hovering ? 0.1 : 0.05))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .onHover { hovering = $0 }
+    }
+
+    private func rowButton(_ icon: String, help: String, danger: Bool = false,
+                           action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .medium))
+                .frame(width: 26, height: 26)
+                .foregroundStyle(danger ? Color(red: 1, green: 0.5, blue: 0.5) : .white.opacity(0.75))
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(danger ? Color.red.opacity(0.18) : Color.white.opacity(0.13))
+                )
+        }
+        .buttonStyle(.plain)
+        .help(help)
     }
 }

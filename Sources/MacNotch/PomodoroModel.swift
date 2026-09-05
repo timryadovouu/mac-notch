@@ -20,8 +20,6 @@ final class PomodoroModel: ObservableObject {
     static let presets = [5, 10, 15, 25, 30, 60]
 
     var workDuration: TimeInterval = 25 * 60
-    var shortBreakDuration: TimeInterval = 5 * 60
-    var longBreakDuration: TimeInterval = 15 * 60
     let sessionsBeforeLongBreak = 4
 
     @Published private(set) var phase: PomodoroPhase = .work
@@ -29,21 +27,23 @@ final class PomodoroModel: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var completedWorkSessions = 0
 
+    private let settings: Settings
     private var timer: Timer?
 
     /// Fired when a phase completes naturally, with the new phase — used for the
     /// left-side "rest" / "focus" alert.
     var onPhaseChange: ((PomodoroPhase) -> Void)?
 
-    init() {
+    init(settings: Settings) {
+        self.settings = settings
         timeRemaining = workDuration
     }
 
     var currentPhaseDuration: TimeInterval {
         switch phase {
         case .work: return workDuration
-        case .shortBreak: return shortBreakDuration
-        case .longBreak: return longBreakDuration
+        case .shortBreak: return TimeInterval(settings.shortBreakMinutes * 60)
+        case .longBreak: return TimeInterval(settings.longBreakMinutes * 60)
         }
     }
 
@@ -92,7 +92,7 @@ final class PomodoroModel: ObservableObject {
     }
 
     private func advancePhase(playSound: Bool) {
-        if playSound { NSSound.beep() }
+        if playSound && settings.pomodoroSound { NSSound.beep() }
         switch phase {
         case .work:
             completedWorkSessions += 1

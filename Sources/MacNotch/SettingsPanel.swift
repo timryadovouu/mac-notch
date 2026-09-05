@@ -15,7 +15,7 @@ final class SettingsWindowController {
     func show() {
         if window == nil {
             let w = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 460, height: 340),
+                contentRect: NSRect(x: 0, y: 0, width: 460, height: 460),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
@@ -40,6 +40,15 @@ final class SettingsWindowController {
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
+
+    /// Open the settings window, or hide it if it's already showing.
+    func toggle() {
+        if let w = window, w.isVisible {
+            w.orderOut(nil)
+        } else {
+            show()
+        }
+    }
 }
 
 struct SettingsView: View {
@@ -48,6 +57,26 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section("General") {
+                Toggle("Launch at login", isOn: $settings.launchAtLogin)
+            }
+
+            Section("Modules") {
+                ForEach(settings.orderedModules) { module in
+                    moduleRow(module)
+                }
+            }
+
+            Section("Timer") {
+                Stepper(value: $settings.shortBreakMinutes, in: 1...60) {
+                    Text("Short break: \(settings.shortBreakMinutes) min")
+                }
+                Stepper(value: $settings.longBreakMinutes, in: 1...60) {
+                    Text("Long break: \(settings.longBreakMinutes) min")
+                }
+                Toggle("Play sound when a session ends", isOn: $settings.pomodoroSound)
+            }
+
             Section("Buffer") {
                 HStack {
                     Text("Folder")
@@ -74,14 +103,33 @@ struct SettingsView: View {
                     Text("Reset to default tab after \(settings.recallMinutes) min")
                 }
                 Picker("Default tab", selection: $settings.defaultModuleRaw) {
-                    ForEach(Module.allCases) { module in
+                    ForEach(settings.enabledModules) { module in
                         Text(module.name).tag(module.rawValue)
                     }
                 }
             }
         }
         .formStyle(.grouped)
-        .frame(minWidth: 460, minHeight: 340)
+        .frame(minWidth: 460, minHeight: 440)
+    }
+
+    private func moduleRow(_ module: Module) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: module.icon).frame(width: 18)
+            Text(module.name)
+            Spacer()
+            Button { settings.moveModule(module, up: true) } label: { Image(systemName: "chevron.up") }
+                .buttonStyle(.borderless)
+                .disabled(settings.moduleOrder.first == module.rawValue)
+            Button { settings.moveModule(module, up: false) } label: { Image(systemName: "chevron.down") }
+                .buttonStyle(.borderless)
+                .disabled(settings.moduleOrder.last == module.rawValue)
+            Toggle("", isOn: Binding(
+                get: { settings.isEnabled(module) },
+                set: { settings.setModuleEnabled(module, $0) }
+            ))
+            .labelsHidden()
+        }
     }
 
     private func pickFolder() {

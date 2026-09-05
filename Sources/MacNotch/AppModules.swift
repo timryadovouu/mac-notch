@@ -14,7 +14,7 @@ final class AppModules {
     init() {
         let settings = Settings()
         self.settings = settings
-        pomodoro = PomodoroModel()
+        pomodoro = PomodoroModel(settings: settings)
         buffer = BufferManager(settings: settings)
         system = SystemStats()
         usage = AppUsageTracker()
