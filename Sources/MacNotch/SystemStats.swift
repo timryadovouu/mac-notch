@@ -61,8 +61,11 @@ final class SystemStats: ObservableObject {
         }
         guard result == KERN_SUCCESS else { return (ramUsed, total) }
         let page = Double(vm_page_size)
-        let used = (Double(stats.active_count) + Double(stats.wire_count)
-                    + Double(stats.compressor_page_count)) * page
+        // Resident "used" = active + wired, matching htop/btop. We deliberately
+        // leave out the compressor's footprint and inactive/cached file pages, so
+        // this reads lower than Activity Monitor's "Memory Used" (which adds the
+        // compressed pages on top).
+        let used = (Double(stats.active_count) + Double(stats.wire_count)) * page
         return (used, total)
     }
 

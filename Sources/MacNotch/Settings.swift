@@ -21,6 +21,8 @@ final class Settings: ObservableObject {
     @Published var shortBreakMinutes: Int { didSet { d.set(shortBreakMinutes, forKey: "shortBreakMinutes") } }
     @Published var longBreakMinutes: Int { didSet { d.set(longBreakMinutes, forKey: "longBreakMinutes") } }
     @Published var pomodoroSound: Bool { didSet { d.set(pomodoroSound, forKey: "pomodoroSound") } }
+    @Published var pomodoroSoundName: String { didSet { d.set(pomodoroSoundName, forKey: "pomodoroSoundName") } }
+    @Published var soundDuringDND: Bool { didSet { d.set(soundDuringDND, forKey: "soundDuringDND") } }
 
     // MARK: Screen Time
     @Published var screenTimeRetentionDays: Int { didSet { d.set(screenTimeRetentionDays, forKey: "screenTimeRetentionDays") } }
@@ -49,6 +51,8 @@ final class Settings: ObservableObject {
         shortBreakMinutes = d.object(forKey: "shortBreakMinutes") as? Int ?? 5
         longBreakMinutes = d.object(forKey: "longBreakMinutes") as? Int ?? 15
         pomodoroSound = d.object(forKey: "pomodoroSound") as? Bool ?? true
+        pomodoroSoundName = d.string(forKey: "pomodoroSoundName") ?? "Funk"
+        soundDuringDND = d.object(forKey: "soundDuringDND") as? Bool ?? true
 
         screenTimeRetentionDays = d.object(forKey: "screenTimeRetentionDays") as? Int ?? 365
 

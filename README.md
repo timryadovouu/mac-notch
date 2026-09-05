@@ -39,11 +39,11 @@ executable — pure SwiftUI + AppKit, **no third-party dependencies**.
 
 | Module | What it does |
 | --- | --- |
-| ⏱ **Timer** | Pomodoro with focus presets (5 / 10 / 15 / 25 / 30 / 60 min), a long break every 4 sessions. Configurable break lengths and an optional completion sound. A live countdown shows to the right of the notch; each phase change slides a **Focus / Break** alert in from the left. |
+| ⏱ **Timer** | Pomodoro with focus presets (5 / 10 / 15 / 25 / 30 / 60 min), a long break every 4 sessions. Configurable break lengths and a completion sound — pick any system sound (hover to preview) and choose whether it still plays during a Focus. A live countdown shows to the right of the notch; each phase change slides a **Focus / Break** alert in from the left. |
 | 📋 **Buffer** | A persistent clipboard. Everything you copy is saved as a **real file** under the buffer folder, in a per-day `YYYY-MM-DD` subfolder — text, images, and any copied files. Click an entry to copy it back, or **drag it straight out** to Finder / any app. Per-row copy & delete on hover; "Finder" opens the folder, "Clear day" wipes today. Deletions made directly in the folder show up automatically. |
 | 🎵 **Media** | Now-playing + transport for **Spotify** (AppleScript) and **cmus** (`cmus-remote`). Play/pause reacts instantly. While something plays, a little **equalizer** pulses to the left of the notch; pause it and a coral ⏸ takes its place. |
 | ✅ **Tasks** | A local to-do list: add, complete, delete, restore. **Undone tasks stay on top, completed ones sink to the bottom.** Copy a task's text, or move it to a trash that keeps deleted items for a while. |
-| ⏳ **Screen Time** | Local, on-device usage tracking: it credits the frontmost app every second and shows ranked apps (with icons), total time and switch count. **Each day is kept as its own snapshot — browse past days with ◀ / ▶**, and toggle a 7-day bar chart. Resets at midnight; history retention is configurable. |
+| ⏳ **Screen Time** | Local, on-device usage tracking: it credits the frontmost app every second and shows ranked apps (with icons), total time and switch count. **Each day is kept as its own snapshot — browse past days with ◀ / ▶**, and toggle a bar chart of the current week (Mon–Sun). Resets at midnight; history retention is configurable. |
 
 The **Tasks, Buffer and Screen Time** panels have a little home-indicator grabber
 at the bottom — tap it to grow the panel vertically (and again to shrink).
@@ -52,7 +52,9 @@ at the bottom — tap it to grow the panel vertically (and again to shrink).
 
 When the panel is open, the black areas either side of the lens show live
 **system metrics**: **CPU** on the left (coral bar + %), **RAM** on the right
-(used / total GB). No tab, no clutter — just there while you're already looking.
+(used / total GB). RAM "used" is resident active + wired memory, matching
+`htop` / `btop` rather than Activity Monitor's higher, compression-inclusive
+figure. No tab, no clutter — just there while you're already looking.
 
 ## The collapsed strip
 
@@ -96,7 +98,7 @@ The coral **gear** toggles a standalone window:
 
 - **General** — Launch at login, and Track Claude Code.
 - **Modules** — enable/disable and reorder the tabs in the rail.
-- **Timer** — short/long break lengths and the completion sound.
+- **Timer** — short/long break lengths, the end-of-session sound (any system sound, hover to preview), and whether it plays during a Focus.
 - **Screen Time** — how long to keep daily history (default 1 year).
 - **Buffer** — folder location, auto-clear age, or clear-at-end-of-day.
 - **Notch** — reset-to-default-tab delay and which tab is the default.

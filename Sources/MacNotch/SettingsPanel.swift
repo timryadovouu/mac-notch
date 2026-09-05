@@ -80,6 +80,10 @@ struct SettingsView: View {
                     Text("Long break: \(settings.longBreakMinutes) min")
                 }
                 Toggle("Play sound when a session ends", isOn: $settings.pomodoroSound)
+                if settings.pomodoroSound {
+                    soundList
+                    Toggle("Play sound during Do Not Disturb / Focus", isOn: $settings.soundDuringDND)
+                }
             }
 
             Section("Screen Time") {
@@ -127,6 +131,40 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(minWidth: 460, minHeight: 440)
+    }
+
+    private var soundList: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Sound — hover to preview")
+                .font(.caption).foregroundStyle(.secondary)
+            ScrollView {
+                VStack(spacing: 1) {
+                    ForEach(SystemSounds.available, id: \.self) { soundRow($0) }
+                }
+                .padding(2)
+            }
+            .frame(height: 132)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.1)))
+        }
+    }
+
+    private func soundRow(_ name: String) -> some View {
+        let selected = settings.pomodoroSoundName == name
+        return HStack(spacing: 8) {
+            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 12))
+                .foregroundStyle(selected ? Color.accentColor : Color.secondary.opacity(0.5))
+            Text(name).font(.system(size: 12))
+            Spacer()
+        }
+        .padding(.vertical, 3).padding(.horizontal, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 5)
+            .fill(selected ? Color.accentColor.opacity(0.18) : Color.clear))
+        .contentShape(Rectangle())
+        .onHover { if $0 { SystemSounds.preview(name) } }
+        .onTapGesture { settings.pomodoroSoundName = name; SystemSounds.preview(name) }
     }
 
     private func moduleRow(_ module: Module) -> some View {

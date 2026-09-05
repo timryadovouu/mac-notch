@@ -30,6 +30,9 @@ final class PomodoroModel: ObservableObject {
     private let settings: Settings
     private var timer: Timer?
 
+    /// The last session-end chime, held so it isn't freed mid-play.
+    private var chime: NSSound?
+
     /// Fired when a phase completes naturally, with the new phase — used for the
     /// left-side "rest" / "focus" alert.
     var onPhaseChange: ((PomodoroPhase) -> Void)?
@@ -92,7 +95,14 @@ final class PomodoroModel: ObservableObject {
     }
 
     private func advancePhase(playSound: Bool) {
-        if playSound && settings.pomodoroSound { NSSound.beep() }
+        // Our NSSound plays directly, so Focus/Do Not Disturb does NOT mute it.
+        // When the user opts out of sound during Focus, suppress it ourselves.
+        let mutedByFocus = !settings.soundDuringDND && FocusMonitor.isActive
+        if playSound && settings.pomodoroSound && !mutedByFocus {
+            let s = NSSound(named: settings.pomodoroSoundName) ?? NSSound(named: "Funk")
+            chime = s   // retain across the async play
+            if let s { s.stop(); s.play() } else { NSSound.beep() }
+        }
         switch phase {
         case .work:
             completedWorkSessions += 1

@@ -54,22 +54,31 @@ struct ScreenTimePanel: View {
     // MARK: - Week chart
 
     private var weekChart: some View {
-        let bars = (-6 ... 0).map { off in (off, off == 0 ? usage.totalSeconds : (pastTotals[off] ?? 0)) }
+        // Current calendar week, Monday first. Offsets are relative to today;
+        // days still to come this week show empty and aren't selectable.
+        let weekday = Calendar.current.component(.weekday, from: Date())  // 1=Sun … 7=Sat
+        let mondayOffset = (weekday + 5) % 7                              // Mon=0 … Sun=6
+        let bars = (0 ... 6).map { i -> (Int, Int, Bool) in
+            let off = i - mondayOffset
+            let total = off == 0 ? usage.totalSeconds : (off < 0 ? (pastTotals[off] ?? 0) : 0)
+            return (off, total, off <= 0)
+        }
         let maxV = max(1, bars.map { $0.1 }.max() ?? 1)
         return HStack(alignment: .bottom, spacing: 5) {
-            ForEach(bars, id: \.0) { off, total in
+            ForEach(bars, id: \.0) { off, total, selectable in
                 let selected = off == offset
                 VStack(spacing: 3) {
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(selected ? Color(red: 0.4, green: 0.7, blue: 1.0) : Color.white.opacity(0.16))
+                        .fill(selected ? Color(red: 0.4, green: 0.7, blue: 1.0)
+                                       : Color.white.opacity(selectable ? 0.16 : 0.06))
                         .frame(height: max(3, CGFloat(total) / CGFloat(maxV) * 32))
                     Text(dayLetter(off))
                         .font(.system(size: 8, weight: selected ? .bold : .regular))
-                        .foregroundStyle(selected ? .white : .white.opacity(0.4))
+                        .foregroundStyle(selected ? .white : .white.opacity(selectable ? 0.4 : 0.2))
                 }
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
-                .onTapGesture { offset = off }
+                .onTapGesture { if selectable { offset = off } }
             }
         }
         .frame(height: 44, alignment: .bottom)
