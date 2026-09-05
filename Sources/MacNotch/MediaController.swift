@@ -22,6 +22,10 @@ final class MediaController: ObservableObject {
         let t = Timer(timeInterval: 1.5, repeats: true) { [weak self] _ in self?.poll() }
         RunLoop.main.add(t, forMode: .common)
         timer = t
+        // Spotify posts this the instant playback changes — no polling lag on ⏯.
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.spotify.client.PlaybackStateChanged"),
+            object: nil, queue: .main) { [weak self] _ in self?.poll() }
         poll()
     }
 

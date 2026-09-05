@@ -20,6 +20,11 @@ final class ClaudeSessionsManager: ObservableObject {
     private var settingsFile: URL { home.appendingPathComponent(".claude/settings.json") }
 
     init() {
+        // Start from the end of the log — events written before launch must not
+        // count as "thinking now" (otherwise the island hangs after relaunch).
+        if let size = (try? FileManager.default.attributesOfItem(atPath: eventsFile.path))?[.size] as? NSNumber {
+            offset = size.uint64Value
+        }
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.poll() }
         RunLoop.main.add(t, forMode: .common)
         timer = t
@@ -49,7 +54,9 @@ final class ClaudeSessionsManager: ObservableObject {
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let id = obj["session_id"] as? String,
               let event = obj["hook_event_name"] as? String else { return }
-        let working = (event == "UserPromptSubmit" || event == "SubagentStop")
+        // "Thinking" is strictly between the user's prompt and Stop; any other
+        // event (Stop, Notification, SessionStart, SubagentStop) clears it.
+        let working = (event == "UserPromptSubmit")
         if event == "SessionEnd" { status[id] = nil } else { status[id] = (working, Date()) }
     }
 

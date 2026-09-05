@@ -11,6 +11,8 @@ struct NotchRootView: View {
     let modules: AppModules
     let metrics: NotchMetrics
 
+    @State private var playFlash = false   // brief play glyph when playback resumes
+
     // Expanded panel size.
     static let panelWidth: CGFloat = 560
     static let panelHeight: CGFloat = 272
@@ -19,7 +21,7 @@ struct NotchRootView: View {
 
     private let timerPillW: CGFloat = 70
     private let eqW: CGFloat = 40
-    private let claudeW: CGFloat = 14   // small coral island (~4x narrower than the music one)
+    private let claudeW: CGFloat = 20   // small coral island; the pulsing dot sits centered
     // Extra black bled onto the menu bar on each side, to hide the 1px seam
     // between the pure-black notch and the tinted menu bar.
     private let bleed: CGFloat = 2
@@ -32,6 +34,8 @@ struct NotchRootView: View {
     private var notchH: CGFloat { metrics.notchHeight }
     private var running: Bool { pomodoro.isRunning }
     private var playing: Bool { media.isPlaying }
+    /// A track is loaded but paused.
+    private var paused: Bool { !state.expanded && media.source != .none && !media.isPlaying }
 
     private var rightExt: CGFloat { (!state.expanded && running) ? timerPillW : 0 }
 
@@ -45,7 +49,7 @@ struct NotchRootView: View {
         if let alert = state.alert {
             return alert.text == nil ? 46 : 50 + CGFloat(alert.text?.count ?? 0) * 7.5
         }
-        if playing { return eqW }
+        if playing || paused { return eqW }   // same width so ⏯ doesn't shift the notch
         return 0
     }
 
@@ -82,12 +86,19 @@ struct NotchRootView: View {
                 .animation(.spring(response: 0.28, dampingFraction: 0.72), value: state.alert)
                 .animation(.spring(response: 0.3, dampingFraction: 0.78), value: running)
                 .animation(.spring(response: 0.3, dampingFraction: 0.78), value: playing)
+                .animation(.spring(response: 0.3, dampingFraction: 0.78), value: paused)
                 .animation(.spring(response: 0.3, dampingFraction: 0.78), value: showClaude)
                 .animation(.spring(response: 0.34, dampingFraction: 0.84), value: state.tall)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         // Fill into the notch/menu-bar safe area so no thin gap shows at the top.
         .ignoresSafeArea(.all)
+        .onChange(of: playing) { isPlaying in
+            if isPlaying {
+                playFlash = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { playFlash = false }
+            }
+        }
     }
 
     @ViewBuilder private var islandContent: some View {
@@ -119,7 +130,18 @@ struct NotchRootView: View {
                     }
                     .transition(.scale.combined(with: .opacity))
                 } else if playing {
-                    EqualizerBars(color: Color(red: 0.35, green: 0.85, blue: 0.45))
+                    if playFlash {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Color(red: 0.980, green: 0.514, blue: 0.302))
+                    } else {
+                        EqualizerBars(color: Color(red: 0.35, green: 0.85, blue: 0.45))
+                            .transition(.opacity)
+                    }
+                } else if paused {
+                    Image(systemName: "pause.fill")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color(red: 0.980, green: 0.514, blue: 0.302))
                         .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -131,9 +153,8 @@ struct NotchRootView: View {
             // Claude island (coral) — inner to the timer, shown while a session thinks.
             ZStack {
                 if showClaude {
-                    Capsule().fill(Color(red: 0.980, green: 0.514, blue: 0.302))
-                        .padding(.vertical, notchH * 0.30)
-                        .padding(.horizontal, 2)
+                    ClaudeBlob()
+                        .frame(width: 11, height: 11)
                         .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -175,7 +196,23 @@ struct EqualizerBars: View {
     }
 
     private func height(_ t: Double, _ i: Int) -> CGFloat {
-        let v = (sin(t * 6.0 + Double(i) * 1.3) + 1) / 2   // 0...1
-        return 4 + v * 12
+        // Two sines with an irrational frequency ratio → long, organic, non-cyclic.
+        let p = Double(i)
+        let v = 0.5 + 0.30 * sin(t * 5.3 + p * 2.1) + 0.20 * sin(t * 9.7 + p * 4.3)
+        return 4 + min(1, max(0, v)) * 12
+    }
+}
+
+/// Small pulsing coral "blob" shown while a Claude session is thinking.
+struct ClaudeBlob: View {
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            let p = 0.5 + 0.5 * sin(t * 3.0)   // 0...1
+            Circle()
+                .fill(Color(red: 0.980, green: 0.514, blue: 0.302))
+                .scaleEffect(0.7 + 0.3 * p)
+                .opacity(0.6 + 0.4 * p)
+        }
     }
 }
