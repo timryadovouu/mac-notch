@@ -74,7 +74,10 @@ final class TodoStore: ObservableObject {
     }
 
     private func refresh() {
-        items = all.filter { $0.deletedAt == nil }
+        // Undone tasks on top, completed ones sink to the bottom (order within
+        // each group preserved).
+        let active = all.filter { $0.deletedAt == nil }
+        items = active.filter { !$0.done } + active.filter { $0.done }
         trash = all.filter { $0.deletedAt != nil }
             .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
     }

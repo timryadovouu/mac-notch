@@ -3,6 +3,13 @@
 set -e
 cd "$(dirname "$0")"
 
+# Version: from $VERSION (CI passes the tag), else the latest git tag, else a dev default.
+VERSION="${VERSION:-$(git describe --tags --always 2>/dev/null)}"
+VERSION="${VERSION#v}"
+VERSION="${VERSION:-0.1.0-dev}"
+BUILD="${VERSION%%-*}"            # numeric part only, for CFBundleVersion
+echo "==> Version $VERSION (build $BUILD)"
+
 echo "==> swift build -c release"
 swift build -c release
 
@@ -29,7 +36,7 @@ if [ -f "Resources/AppIcon.png" ]; then
   rm -rf "$(dirname "$ICONSET")"
 fi
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -37,8 +44,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleName</key>             <string>mac-notch</string>
     <key>CFBundleDisplayName</key>      <string>mac-notch</string>
     <key>CFBundleIdentifier</key>       <string>io.macnotch.app</string>
-    <key>CFBundleVersion</key>          <string>1.0</string>
-    <key>CFBundleShortVersionString</key><string>1.0</string>
+    <key>CFBundleVersion</key>          <string>${BUILD}</string>
+    <key>CFBundleShortVersionString</key><string>${VERSION}</string>
     <key>CFBundleExecutable</key>       <string>MacNotch</string>
     <key>CFBundleIconFile</key>         <string>AppIcon</string>
     <key>CFBundlePackageType</key>      <string>APPL</string>

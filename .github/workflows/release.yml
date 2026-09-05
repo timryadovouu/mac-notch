@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish release
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build & package
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: ./build-app.sh
+
+      - name: Zip the app
+        run: ditto -c -k --keepParent mac-notch.app mac-notch.zip
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Tags with a pre-release identifier (e.g. -beta, -rc) are marked as pre-releases.
+          PRERELEASE=""
+          case "$TAG" in *-*) PRERELEASE="--prerelease" ;; esac
+          gh release create "$TAG" mac-notch.zip \
+            --title "$TAG" \
+            --generate-notes $PRERELEASE
