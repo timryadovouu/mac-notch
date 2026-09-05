@@ -6,9 +6,17 @@ import Foundation
 final class ClaudeSessionsManager: ObservableObject {
     @Published private(set) var anyWorking = false
 
+    /// When the exhausted usage window frees up, if a limit is currently hit.
+    /// nil when no window is at/over the block threshold (Claude is available).
+    /// Fed by ratelimit.json, which our statusLine command writes.
+    @Published private(set) var limitResetAt: Date?
+
     /// A session is dropped from "working" if it hasn't produced an event in this
     /// long (guards against a session that never emits Stop, e.g. after a crash).
     private let workingTimeout: TimeInterval = 10 * 60
+
+    /// A window counts as "hit" (Claude blocked) at or above this percentage.
+    private let limitBlockThreshold = 99.0
 
     private var status: [String: (working: Bool, at: Date)] = [:]
     private var offset: UInt64 = 0
@@ -17,6 +25,7 @@ final class ClaudeSessionsManager: ObservableObject {
     private let home = FileManager.default.homeDirectoryForCurrentUser
     private var dir: URL { home.appendingPathComponent(".claude/mac-notch") }
     private var eventsFile: URL { dir.appendingPathComponent("events.jsonl") }
+    private var rateLimitFile: URL { dir.appendingPathComponent("ratelimit.json") }
     private var settingsFile: URL { home.appendingPathComponent(".claude/settings.json") }
 
     init() {
@@ -47,6 +56,28 @@ final class ClaudeSessionsManager: ObservableObject {
             }
         }
         recompute()
+        readRateLimit()
+    }
+
+    /// Read the reset times captured by our statusLine command. The binding
+    /// reset is the latest `resets_at` among windows that are currently hit; if
+    /// none are hit, Claude is available and this is nil.
+    private func readRateLimit() {
+        guard let data = try? Data(contentsOf: rateLimitFile),
+              let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            if limitResetAt != nil { limitResetAt = nil }
+            return
+        }
+        var candidates: [Date] = []
+        for (usedKey, resetKey) in [("five_hour_used", "five_hour_resets_at"),
+                                    ("seven_day_used", "seven_day_resets_at")] {
+            if let used = o[usedKey] as? Double, used >= limitBlockThreshold,
+               let epoch = o[resetKey] as? Double {
+                candidates.append(Date(timeIntervalSince1970: epoch))
+            }
+        }
+        let reset = candidates.max()
+        if reset != limitResetAt { limitResetAt = reset }
     }
 
     private func process(_ line: String) {
@@ -92,6 +123,11 @@ final class ClaudeSessionsManager: ObservableObject {
             hooks[event] = arr
         }
         root["hooks"] = hooks
+
+        // statusLine: the only source of the usage-limit reset times. Point it at
+        // our own executable's hidden `statusline` subcommand.
+        let exe = Bundle.main.executableURL?.path ?? CommandLine.arguments.first ?? "mac-notch"
+        root["statusLine"] = ["type": "command", "command": "\"\(exe)\" statusline"]
 
         guard let out = try? JSONSerialization.data(withJSONObject: root,
                                                     options: [.prettyPrinted, .sortedKeys]) else { return false }

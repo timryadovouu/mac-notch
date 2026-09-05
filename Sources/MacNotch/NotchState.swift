@@ -74,7 +74,7 @@ final class NotchState: ObservableObject {
 
     /// Icon-only effect shown on a new copy.
     func flashCopy() {
-        show(NotchAlert(icon: "doc.on.clipboard.fill", text: nil, color: .white), duration: 1.4)
+        show(NotchAlert(icon: "doc.on.clipboard.fill", text: nil, color: .coral), duration: 1.4)
     }
 
     /// Shown when a Pomodoro phase changes (rest starts / next focus starts).

@@ -1,5 +1,10 @@
 import SwiftUI
 
+extension Color {
+    /// The app's coral accent (#FA834D) — used for Claude, the copy flash, etc.
+    static let coral = Color(red: 0.980, green: 0.514, blue: 0.302)
+}
+
 /// MM:SS from a number of seconds.
 func formatTime(_ seconds: TimeInterval) -> String {
     let total = max(0, Int(seconds.rounded()))

@@ -13,6 +13,9 @@
   <a href="https://github.com/timryadovouu/mac-notch/actions/workflows/build.yml">
     <img src="https://github.com/timryadovouu/mac-notch/actions/workflows/build.yml/badge.svg" alt="Build" />
   </a>
+  <a href="https://github.com/timryadovouu/mac-notch/releases">
+    <img src="https://img.shields.io/github/v/release/timryadovouu/mac-notch?include_prereleases&color=FA834D" alt="Latest release" />
+  </a>
   <img src="https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white" alt="macOS 13+" />
   <img src="https://img.shields.io/badge/Swift-5.9-FA834D?logo=swift&logoColor=white" alt="Swift 5.9" />
   <img src="https://img.shields.io/badge/UI-SwiftUI%20%2B%20AppKit-3178C6" alt="SwiftUI + AppKit" />
@@ -24,8 +27,8 @@
 ## Overview
 
 **mac-notch** turns the empty space around the camera notch into a small control
-center. Everything is a module you can jump between from a horizontal icon rail;
-the coral gear opens a proper Settings window. It's a single Swift Package
+center. Everything is a module you jump between from a horizontal icon rail; the
+coral gear opens a proper Settings window. It's a single Swift Package
 executable — pure SwiftUI + AppKit, **no third-party dependencies**.
 
 - Runs as an **accessory app** (`LSUIElement`) — invisible in the Dock and menu bar.
@@ -36,28 +39,62 @@ executable — pure SwiftUI + AppKit, **no third-party dependencies**.
 
 | Module | What it does |
 | --- | --- |
-| ⏱ **Timer** | Pomodoro with focus presets (5 / 10 / 15 / 25 / 30 / 60 min), 4 sessions before a long break. Configurable break lengths and an optional completion sound. A live countdown shows to the right of the notch; each phase change slides a **Focus / Break** alert in from the left. |
+| ⏱ **Timer** | Pomodoro with focus presets (5 / 10 / 15 / 25 / 30 / 60 min), a long break every 4 sessions. Configurable break lengths and an optional completion sound. A live countdown shows to the right of the notch; each phase change slides a **Focus / Break** alert in from the left. |
 | 📋 **Buffer** | A persistent clipboard. Everything you copy is saved as a **real file** under the buffer folder, in a per-day `YYYY-MM-DD` subfolder — text, images, and any copied files. Click an entry to copy it back, or **drag it straight out** to Finder / any app. Per-row copy & delete on hover; "Finder" opens the folder, "Clear day" wipes today. Deletions made directly in the folder show up automatically. |
-| 🎵 **Media** | Now-playing + transport for **Spotify** (AppleScript) and **cmus** (`cmus-remote`). While something plays, a little **equalizer** pulses to the left of the notch. |
+| 🎵 **Media** | Now-playing + transport for **Spotify** (AppleScript) and **cmus** (`cmus-remote`). Play/pause reacts instantly. While something plays, a little **equalizer** pulses to the left of the notch; pause it and a coral ⏸ takes its place. |
 | ✅ **Tasks** | A local to-do list: add, complete, delete, restore. **Undone tasks stay on top, completed ones sink to the bottom.** Copy a task's text, or move it to a trash that keeps deleted items for a while. |
-| ⏳ **Screen Time** | Local, on-device usage tracking: it credits the frontmost app every second and shows ranked apps (with icons), total time and switch count. **Each day is kept as its own snapshot — browse past days with ◀ / ▶.** Resets at midnight; history retention is configurable. |
-| 🖥 **System** | Live CPU / RAM / storage gauges. |
+| ⏳ **Screen Time** | Local, on-device usage tracking: it credits the frontmost app every second and shows ranked apps (with icons), total time and switch count. **Each day is kept as its own snapshot — browse past days with ◀ / ▶**, and toggle a 7-day bar chart. Resets at midnight; history retention is configurable. |
 
 The **Tasks, Buffer and Screen Time** panels have a little home-indicator grabber
 at the bottom — tap it to grow the panel vertically (and again to shrink).
+
+## Beside the camera
+
+When the panel is open, the black areas either side of the lens show live
+**system metrics**: **CPU** on the left (coral bar + %), **RAM** on the right
+(used / total GB). No tab, no clutter — just there while you're already looking.
 
 ## The collapsed strip
 
 Even when closed, the brow stays useful:
 
-- **Right** — the Pomodoro countdown while a timer runs.
-- **Left** — a pulsing equalizer while music plays, or a brief alert on copy / timer phase change.
+- **Left** — a pulsing **equalizer** while music plays (a coral ⏸ when paused), or a
+  brief coral flash on copy and a **Focus / Break** alert on a timer phase change.
+- **Right** — the Pomodoro **countdown** while a timer runs, and a small pulsing
+  **coral blob** whenever a Claude Code session is thinking (see below).
+
+## Claude Code integration
+
+Optional, off by default. Flip **Track Claude Code** in Settings and mac-notch
+gives you two things:
+
+- A pulsing **coral blob** on the right of the notch while any Claude Code
+  session is actively working — it lights only between your prompt and Claude's
+  stop, so it's a real "thinking now" indicator, not just "a session is open".
+- When you hit a usage limit, a coral **"Claude will be ready at HH:MM"** line in
+  the Timer tab — and **"Claude is ready!"** once the window frees up. The time is
+  captured once and survives quitting Claude, since it's read back from disk.
+
+**How it works.** Enabling the toggle merges a few [hooks](https://docs.claude.com/en/docs/claude-code/hooks)
+and a `statusLine` command into `~/.claude/settings.json` (your existing file is
+backed up to `settings.json.bak` first, and your other settings are preserved):
+
+- The **hooks** append session events to `~/.claude/mac-notch/events.jsonl`; that
+  stream drives the blob.
+- The **statusLine** is the only place Claude Code exposes when a usage window
+  resets, so mac-notch installs *itself* as that command (a hidden
+  `mac-notch statusline` subcommand). It captures the reset times and prints a
+  compact footer: `Opus 4.8 · project · main · ctx 42% · 5h 63% · wk 21%`.
+
+Because it becomes your statusLine, **your Claude Code footer changes to
+mac-notch's** while tracking is on. Everything stays local — nothing is sent
+anywhere.
 
 ## Settings
 
 The coral **gear** toggles a standalone window:
 
-- **Launch at login** — start automatically after a reboot.
+- **General** — Launch at login, and Track Claude Code.
 - **Modules** — enable/disable and reorder the tabs in the rail.
 - **Timer** — short/long break lengths and the completion sound.
 - **Screen Time** — how long to keep daily history (default 1 year).
@@ -68,7 +105,8 @@ The coral **gear** toggles a standalone window:
 
 Requires macOS 13+ and the Xcode command-line tools.
 
-For development:
+Grab a build from [Releases](https://github.com/timryadovouu/mac-notch/releases),
+or build it yourself. For development:
 
 ```bash
 swift run
@@ -81,6 +119,9 @@ Build a double-clickable app (generates the icon, packages `mac-notch.app`):
 open mac-notch.app
 ```
 
+> Unsigned build: the first launch may need **right-click → Open** to get past
+> Gatekeeper.
+
 Quit from the red **Quit** button in the expanded panel.
 
 ## Where data lives
@@ -89,31 +130,34 @@ Everything stays on your Mac:
 
 - Clipboard buffer: `~/Library/Application Support/MacNotch/localBuffer/`
 - Tasks, Screen Time, settings: `~/Library/Application Support/MacNotch/`
+- Claude Code tracking (only if enabled): `~/.claude/mac-notch/`
 
 ## Permissions
 
-- **Media → Spotify** uses AppleScript, so macOS will ask for **Automation** access
-  the first time — approve it or the track/controls won't work. **cmus** needs
-  `cmus-remote` on your `PATH`. Nothing else requires special permissions.
+- **Media → Spotify** uses AppleScript, so macOS will ask for **Automation**
+  access the first time — approve it or the track/controls won't work. **cmus**
+  needs `cmus-remote` on your `PATH`. Nothing else requires special permissions.
 
 ## Project structure
 
 ```
 Sources/MacNotch/
   main.swift / AppDelegate.swift      app entry (accessory policy, app icon, Edit menu)
+  StatusLine.swift                    `mac-notch statusline` subcommand for Claude Code
   ScreenNotch.swift                   notch geometry (+ non-notch fallback)
   NotchController.swift               the window over the notch + hover logic
-  NotchRootView.swift                 the brow, its morphing & the equalizer
-  ExpandedPanel.swift                 icon rail + module hosting
+  NotchRootView.swift                 the brow, its morphing, equalizer & Claude blob
+  ExpandedPanel.swift                 CPU/RAM header, icon rail + module hosting
   GrabberBar.swift                    shared grow/shrink pill
   *Panel.swift                        per-module UI
   PomodoroModel / BufferManager /
   MediaController / AppUsageTracker /
-  TodoStore / SystemStats             module logic
+  TodoStore / SystemStats /
+  ClaudeSessionsManager               module & integration logic
   Settings.swift / SettingsPanel.swift  settings model + window
 Resources/AppIcon.png                 app icon source
 build-app.sh                          release build → mac-notch.app
-.github/workflows/build.yml           CI: build & package on push
+.github/workflows/                     CI: build on push, publish on version tags
 ```
 
 ## Notes

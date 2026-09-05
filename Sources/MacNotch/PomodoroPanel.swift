@@ -2,10 +2,18 @@ import SwiftUI
 
 struct PomodoroPanel: View {
     @ObservedObject var model: PomodoroModel
+    @ObservedObject var claude: ClaudeSessionsManager
 
     private var accent: Color { phaseColor(model.phase) }
 
     var body: some View {
+        VStack(spacing: 8) {
+            timerRow
+            claudeReadyLine
+        }
+    }
+
+    private var timerRow: some View {
         HStack(spacing: 20) {
             // Progress ring with the countdown.
             ZStack {
@@ -47,6 +55,40 @@ struct PomodoroPanel: View {
                 }
             }
         }
+    }
+
+    /// Coral note: when a Claude usage limit is hit, show when it frees up;
+    /// celebrate briefly once it does. Nothing while Claude is available.
+    private var claudeReadyLine: some View {
+        TimelineView(.periodic(from: Date(), by: 20)) { ctx in
+            Group {
+                if let text = readyText(now: ctx.date) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "sparkles").font(.system(size: 10, weight: .semibold))
+                        Text(text).font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.coral)
+                    .transition(.opacity)
+                }
+            }
+            .frame(height: 16)
+        }
+        .frame(height: 16)
+    }
+
+    private func readyText(now: Date) -> String? {
+        guard let reset = claude.limitResetAt else { return nil }
+        if now < reset { return "Claude will be ready at \(clock(reset))" }
+        // Celebrate for an hour after the reset, then fall silent.
+        if now < reset.addingTimeInterval(60 * 60) { return "Claude is ready!" }
+        return nil
+    }
+
+    private func clock(_ date: Date) -> String {
+        let f = DateFormatter()
+        // Add the weekday when the reset isn't today (e.g. a weekly limit).
+        f.dateFormat = Calendar.current.isDateInToday(date) ? "HH:mm" : "EEE HH:mm"
+        return f.string(from: date)
     }
 
     private var presets: some View {

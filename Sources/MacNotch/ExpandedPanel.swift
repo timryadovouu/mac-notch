@@ -48,7 +48,7 @@ struct ExpandedPanel: View {
             Group {
                 switch current {
                 case .media: MediaPanel(media: modules.media)
-                case .timer: PomodoroPanel(model: modules.pomodoro)
+                case .timer: PomodoroPanel(model: modules.pomodoro, claude: modules.claude)
                 case .tasks: TodoPanel(store: modules.todo, state: state)
                 case .buffer: BufferPanel(manager: modules.buffer, state: state)
                 case .screenTime: ScreenTimePanel(usage: modules.usage, state: state)
@@ -85,20 +85,20 @@ struct ExpandedPanel: View {
     }
 
     private func metric(_ label: String, _ fraction: Double, _ value: String, _ color: Color) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Text(label)
-                .font(.system(size: 8, weight: .medium))
-                .foregroundStyle(.white.opacity(0.45))
-                .frame(width: 26, alignment: .leading)
-            Capsule().fill(Color.white.opacity(0.12))
-                .frame(width: 46, height: 4)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.5))
+                .frame(width: 30, alignment: .leading)
+            Capsule().fill(Color.white.opacity(0.14))
+                .frame(width: 54, height: 7)
                 .overlay(alignment: .leading) {
                     Capsule().fill(color)
-                        .frame(width: 46 * min(1, max(0.03, fraction)), height: 4)
+                        .frame(width: 54 * min(1, max(0.03, fraction)), height: 7)
                 }
             Text(value)
-                .font(.system(size: 8, weight: .medium)).monospacedDigit()
-                .foregroundStyle(.white.opacity(0.7))
+                .font(.system(size: 10, weight: .semibold)).monospacedDigit()
+                .foregroundStyle(.white.opacity(0.78))
                 .fixedSize()
         }
     }
